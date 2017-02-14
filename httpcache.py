@@ -176,6 +176,7 @@ class Cache(object):
         while self._is_redirect(record.status_code):
             record = self._retrieve(record.content)
             record = UrlRecord(*record)
+            # TBD: This may run forever
         return record
 
     def list(self):
