@@ -3,7 +3,7 @@ If the page was downloaded before, it retrieves it from the cache.
 I used this to retrieve websites that lock you out if you request the same
 page too often.
 
-Free software. Use and change, improve and distribute. Give credit.
+Free software. Use and change. Improve and distribute. Give credit.
 Be excellent to each other.
 Author, Johannes Feb 2017, http://cessor.de
 '''
@@ -22,6 +22,7 @@ HTML_CACHE = 'cache.sqlite'
 
 
 def timestamp():
+    # TBD: Eher durch isoformat ersetzen
     now = datetime.datetime.now()
     format_ = '%Y-%m-%d %H:%M:%S'
     return datetime.datetime.strftime(now, format_)
@@ -31,11 +32,17 @@ def default_session():
     return requests.Session()
 
 
+class RedirectOccurred(Exception):
+    def __init__(self, response):
+        self.response = response
+
+
 class Throttle(object):
     '''Waits before issuing a request.
 
     Some sites may lock you out when you issue too many requests too quickly.
-    The throttle only applies to web requests
+    The throttle only applies to web requests. Obviously, getting stuff from
+    cache is fast if the file is already cached.
     '''
     def __init__(self, session=None, pause=1):
         self.session = session or default_session()
@@ -74,8 +81,8 @@ class Cache(object):
         Pass it a <requests.Session> object (See Requests: HTTP For Humans)
         Or any object with a get function that can download urls.
     '''
-    def __init__(self, session=None):
-        self.connection = sqlite3.connect(HTML_CACHE)
+    def __init__(self, path='', session=None):
+        self.connection = sqlite3.connect(path or HTML_CACHE)
         self._initialize_database()
         self._session = session or default_session()
 
@@ -86,15 +93,26 @@ class Cache(object):
         self.connection.commit()
         self.connection.close()
 
-    def _download(self, url):
+    def _follow(self, url):
         content = None
         content_type = None
         response = self._session.get(url)
+
+        # Handle Redirects
+        for hop in response.history:
+            source = hop.url
+            status_code = hop.status_code
+            content_type = hop.headers.get('Content-Type')
+            target = hop.headers.get('Location')
+            yield source, status_code, content_type, target
+
+        # Handle End of Redirect Chain
         if response.status_code == 200:
             # Optimistic Guess of Encoding
             content = response.content.decode('utf-8')
             content_type = response.headers.get('Content-Type')
-        return response.status_code, content_type, content or ''
+
+        yield response.url, response.status_code, content_type, content or ''
 
     def _execute(self, sql, params):
         return self.connection.cursor().execute(sql, params)
@@ -127,13 +145,38 @@ class Cache(object):
         sql = """delete from cache"""
         self._execute(sql, ())
 
+    def _is_redirect(self, status_code):
+        return 300 <= status_code < 400
+
     def get(self, url):
         record = self._retrieve(url)
+        # Tbd: Check if the record is to old. Download anew if so.
+
         if not record:
-            status_code, content_type, content = self._download(url)
-            self._insert(url, status_code, content_type, content)
-            return UrlRecord(url, status_code, content_type, content, timestamp())
-        return UrlRecord(*record)
+            # Iterate over all hops and save intermediate results
+            for url, status_code, content_type, content in self._follow(url):
+                try:
+                    self._insert(url, status_code, content_type, content)
+                except sqlite3.IntegrityError:
+                    # When redirecting, in case an intermediate how is already in the cache chain, return the intermediate hop instead:
+                    return self.get(url)
+
+            # Note: Python loops leak their variables.
+            # This therefore returns the last file in a redirect chain
+            return UrlRecord(url,
+                status_code,
+                content_type,
+                content,
+                timestamp()
+            )
+
+        # The record is present in the chache
+        # Resolve redirect chain until the end is reached
+        record = UrlRecord(*record)
+        while self._is_redirect(record.status_code):
+            record = self._retrieve(record.content)
+            record = UrlRecord(*record)
+        return record
 
     def list(self):
         sql = """select url, status_code, content_type, retrieved_at
@@ -158,7 +201,7 @@ def main(args):
         pause = 1
         args = [arg for arg in args if arg != '-t']
 
-    with Cache(Throttle(pause=pause)) as cache:
+    with Cache(session=Throttle(pause=pause)) as cache:
         if '-c' in args:
             prompt = 'Clear cache? This deletes all cached urls.\nYes / No> '
             answer = input()
@@ -211,4 +254,3 @@ if __name__ == '__main__':
         exit()
 
     main(sys.argv[1:])
-
