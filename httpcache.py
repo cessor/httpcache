@@ -241,7 +241,7 @@ Usage: {script} [-r, -l] <url1> [<url2> <url3> ...]
 \t-t:\tThrottle requests to 1 per second
 \t-l:\tLists urls in cache
 \t-r:\tRemoves urls
-\t-c:\Clear cache (removes all data)"""
+\t-c:\tClear cache (removes all data)"""
 
     message = message.format(script=script)
     print(message)
