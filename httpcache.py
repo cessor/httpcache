@@ -32,11 +32,6 @@ def default_session():
     return requests.Session()
 
 
-class RedirectOccurred(Exception):
-    def __init__(self, response):
-        self.response = response
-
-
 class Throttle(object):
     '''Waits before issuing a request.
 
@@ -45,13 +40,12 @@ class Throttle(object):
     cache is fast if the file is already cached.
     '''
     def __init__(self, session=None, pause=1):
-        self.session = session or default_session()
-        self.pause = pause
+        self._session = session or default_session()
+        self._pause = pause
 
     def get(self, url):
-        time.sleep(self.pause)
-        return self.session.get(url)
-
+        time.sleep(self._pause)
+        return self._session.get(url)
 
 class Cache(object):
     '''Returns http responses for a url.
