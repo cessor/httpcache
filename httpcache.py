@@ -168,7 +168,7 @@ class Cache(object):
         # Resolve redirect chain until the end is reached
         record = UrlRecord(*record)
         while self._is_redirect(record.status_code):
-            record = self._retrieve(record.content)
+            record = self.get(record.content)
             record = UrlRecord(*record)
             # TBD: This may run forever
         return record
