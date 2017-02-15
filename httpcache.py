@@ -102,9 +102,17 @@ class Cache(object):
 
         # Handle End of Redirect Chain
         if response.status_code == 200:
-            # Optimistic Guess of Encoding
-            content = response.content.decode('utf-8')
-            content_type = response.headers.get('Content-Type')
+            content_type = response.headers.get('Content-Type').strip()
+            try:
+                # Optimistic Guess of Encoding
+                # for xml and html
+                content = response.content.decode('utf-8')
+
+                # Ideally:
+                # if content_type == 'application/pdf':
+            except:
+                content = response.content
+
 
         yield response.url, response.status_code, content_type, content or ''
 
@@ -121,6 +129,10 @@ class Cache(object):
             retrieved_at datetime default current_timestamp
         )"""
         self._execute(sql, ())
+
+        sql = """create index if not exists url_index on cache (url)"""
+        self._execute(sql, ())
+        self.connection.commit()
 
     def _insert(self, url, status_code, content_type, content):
         sql = """insert into cache (url, status_code, content_type, content)
