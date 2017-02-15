@@ -22,10 +22,8 @@ HTML_CACHE = 'cache.sqlite'
 
 
 def timestamp():
-    # TBD: Eher durch isoformat ersetzen
     now = datetime.datetime.now()
-    format_ = '%Y-%m-%d %H:%M:%S'
-    return datetime.datetime.strftime(now, format_)
+    return now.isoformat()
 
 
 def default_session():
@@ -46,6 +44,7 @@ class Throttle(object):
     def get(self, url):
         time.sleep(self._pause)
         return self._session.get(url)
+
 
 class Cache(object):
     '''Returns http responses for a url.
@@ -113,7 +112,6 @@ class Cache(object):
             except:
                 content = response.content
 
-
         yield response.url, response.status_code, content_type, content or ''
 
     def _execute(self, sql, params):
@@ -164,17 +162,18 @@ class Cache(object):
                 try:
                     self._insert(url, status_code, content_type, content)
                 except sqlite3.IntegrityError:
-                    # When redirecting, in case an intermediate how is already in the cache chain, return the intermediate hop instead:
+                    # When redirecting, in case an intermediate hop is already
+                    # in the cache chain, return the intermediate hop instead:
                     return self.get(url)
 
             # Note: Python loops leak their variables.
             # This therefore returns the last file in a redirect chain
             return UrlRecord(url,
-                status_code,
-                content_type,
-                content,
-                timestamp()
-            )
+                             status_code,
+                             content_type,
+                             content,
+                             timestamp()
+                             )
 
         # The record is present in the chache
         # Resolve redirect chain until the end is reached
@@ -202,6 +201,15 @@ class Cache(object):
 __all__ = ['Cache', 'Throttle']
 
 
+def remove(cache, url):
+    cache.remove(url)
+
+
+def load_url(cache, url):
+    record = cache.get(url)
+    print(record.content)
+
+
 def main(args):
     pause = 0
     if '-t' in args:
@@ -222,12 +230,13 @@ def main(args):
             cache.list()
             return
 
-        if '-r' in args:
+        elif '-r' in args:
             urls = [url for url in args if not url == '-r']
-            action = lambda cache, url: cache.remove(url)
+            action = remove
+
         else:
             urls = args
-            action = lambda cache, url: print(cache.get(url).content)
+            action = load_url
 
         for url in urls:
             action(cache, url)
