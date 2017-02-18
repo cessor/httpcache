@@ -6,6 +6,8 @@ page too often.
 Free software. Use and change. Improve and distribute. Give credit.
 Be excellent to each other.
 Author, Johannes Feb 2017, http://cessor.de
+
+Todo: I need a better name for this.
 '''
 from cache import Cache
 from loader import Loader, Throttle
@@ -31,14 +33,14 @@ def main(args):
         args = [arg for arg in args if arg != '-t']
 
     with Cache(
-            store=Store(),
-            loader=Loader(
-                session=Throttle(
-                    pause=pause
-                )
-            ),
-            folder=Folder()
-        ) as cache:
+        store=Store(),
+        loader=Loader(
+            session=Throttle(
+                pause=pause
+            )
+        ),
+        folder=Folder()
+    ) as cache:
         if '-c' in args:
             prompt = 'Clear cache? This deletes all cached urls.\nYes / No> '
             answer = input()
@@ -73,7 +75,7 @@ def print_usage():
     script = os.path.basename(__file__)
     message = """{script}. Downloads and caches websites.
 
-Usage: {script} [-r, -l] <url1> [<url2> <url3> ...]
+Usage: {script} [-l | -r | -c | -t] <url1> [<url2> <url3> ...]
 
 \t-t:\tThrottle requests to 1 per second
 \t-l:\tLists urls in cache
