@@ -46,6 +46,97 @@ class Throttle(object):
         return self._session.get(url)
 
 
+class Loader(object):
+    def __init__(self, session=None):
+        self._session = session or default_session()
+
+    def follow(self, url):
+        content = None
+        content_type = None
+        response = self._session.get(url)
+
+        # Handle Redirects
+        for hop in response.history:
+            source = hop.url
+            status_code = hop.status_code
+            content_type = hop.headers.get('Content-Type')
+            target = hop.headers.get('Location')
+            yield source, status_code, content_type, target
+
+        # Handle End of Redirect Chain
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type').strip()
+            try:
+                # Optimistic Guess of Encoding
+                # for xml and html
+                content = response.content.decode('utf-8')
+
+                # Ideally:
+                # if content_type == 'application/pdf':
+            except:
+                content = response.content
+
+        yield response.url, response.status_code, content_type, content or ''
+
+
+class Store(object):
+    def __init__(self, path=''):
+        self._connection = sqlite3.connect(path or HTML_CACHE)
+        self._initialize_database()
+
+    def clear(self):
+        sql = """delete from cache"""
+        self._execute(sql, ())
+
+    def close(self):
+        self._connection.commit()
+        self._connection.close()
+
+    def _execute(self, sql, params):
+        return self._connection.cursor().execute(sql, params)
+
+    def _initialize_database(self):
+        sql = """create table if not exists cache (
+            id integer primary key not null,
+            url text not null unique,
+            status_code integer not null,
+            content_type text,
+            content text,
+            retrieved_at datetime default current_timestamp
+        )"""
+        self._execute(sql, ())
+
+        sql = """create index if not exists url_index on cache (url)"""
+        self._execute(sql, ())
+        self._connection.commit()
+
+    def add(self, url, status_code, content_type, content):
+        sql = """insert into cache (url, status_code, content_type, content)
+            values (?, ?, ?, ?)"""
+        self._execute(sql, (url, status_code, content_type, content))
+        self._connection.commit()
+
+    def list(self):
+        sql = """select url, status_code, content_type, retrieved_at
+            from cache"""
+        for record in self._execute(sql, ()):
+            # CSV String
+            print(', '.join(map(str, record)))
+
+    def remove(self, url):
+        sql = """delete from cache
+            where url = ?"""
+        self._execute(sql, (url,)).fetchone()
+        self._connection.commit()
+
+    def retrieve(self, url):
+        sql = """select url, status_code, content_type, content, retrieved_at
+            from cache
+            where url = ?
+            limit 1"""
+        return self._execute(sql, (url,)).fetchone()
+
+
 class Cache(object):
     '''Returns http responses for a url.
 
@@ -74,93 +165,32 @@ class Cache(object):
         Pass it a <requests.Session> object (See Requests: HTTP For Humans)
         Or any object with a get function that can download urls.
     '''
-    def __init__(self, path='', session=None):
-        self.connection = sqlite3.connect(path or HTML_CACHE)
-        self._initialize_database()
-        self._session = session or default_session()
+    def __init__(self, store, loader):
+        self._store = store
+        self._loader = loader
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args, **kwargs):
-        self.connection.commit()
-        self.connection.close()
-
-    def _follow(self, url):
-        content = None
-        content_type = None
-        response = self._session.get(url)
-
-        # Handle Redirects
-        for hop in response.history:
-            source = hop.url
-            status_code = hop.status_code
-            content_type = hop.headers.get('Content-Type')
-            target = hop.headers.get('Location')
-            yield source, status_code, content_type, target
-
-        # Handle End of Redirect Chain
-        if response.status_code == 200:
-            content_type = response.headers.get('Content-Type').strip()
-            try:
-                # Optimistic Guess of Encoding
-                # for xml and html
-                content = response.content.decode('utf-8')
-
-                # Ideally:
-                # if content_type == 'application/pdf':
-            except:
-                content = response.content
-
-        yield response.url, response.status_code, content_type, content or ''
-
-    def _execute(self, sql, params):
-        return self.connection.cursor().execute(sql, params)
-
-    def _initialize_database(self):
-        sql = """create table if not exists cache (
-            id integer primary key not null,
-            url text not null unique,
-            status_code integer not null,
-            content_type text,
-            content text,
-            retrieved_at datetime default current_timestamp
-        )"""
-        self._execute(sql, ())
-
-        sql = """create index if not exists url_index on cache (url)"""
-        self._execute(sql, ())
-        self.connection.commit()
-
-    def _insert(self, url, status_code, content_type, content):
-        sql = """insert into cache (url, status_code, content_type, content)
-            values (?, ?, ?, ?)"""
-        self._execute(sql, (url, status_code, content_type, content))
-        self.connection.commit()
-
-    def _retrieve(self, url):
-        sql = """select url, status_code, content_type, content, retrieved_at
-            from cache
-            where url = ?
-            limit 1"""
-        return self._execute(sql, (url,)).fetchone()
-
-    def clear(self):
-        sql = """delete from cache"""
-        self._execute(sql, ())
+        self._store.close()
 
     def _is_redirect(self, status_code):
         return 300 <= status_code < 400
 
     def get(self, url):
-        record = self._retrieve(url)
+        # TBD:
+        # This needs to be separated into a store
+        # The store handles files and so on
+
+        record = self._store.retrieve(url)
         # Tbd: Check if the record is to old. Download anew if so.
 
         if not record:
             # Iterate over all hops and save intermediate results
-            for url, status_code, content_type, content in self._follow(url):
+            for url, status_code, content_type, content in self._loader.follow(url):
                 try:
-                    self._insert(url, status_code, content_type, content)
+                    self._store.add(url, status_code, content_type, content)
                 except sqlite3.IntegrityError:
                     # When redirecting, in case an intermediate hop is already
                     # in the cache chain, return the intermediate hop instead:
@@ -184,18 +214,14 @@ class Cache(object):
             # TBD: This may run forever
         return record
 
-    def list(self):
-        sql = """select url, status_code, content_type, retrieved_at
-            from cache"""
-        for record in self._execute(sql, ()):
-            # CSV String
-            print(', '.join(map(str, record)))
+    def clear(self):
+        self._store.clear()
 
     def remove(self, url):
-        sql = """delete from cache
-            where url = ?"""
-        self._execute(sql, (url,)).fetchone()
-        self.connection.commit()
+        self._store.remove(url)
+
+    def list(self):
+        return self._store.list()
 
 
 __all__ = ['Cache', 'Throttle']
@@ -216,7 +242,7 @@ def main(args):
         pause = 1
         args = [arg for arg in args if arg != '-t']
 
-    with Cache(session=Throttle(pause=pause)) as cache:
+    with Cache(Store(), loader=Loader(session=Throttle(pause=pause))) as cache:
         if '-c' in args:
             prompt = 'Clear cache? This deletes all cached urls.\nYes / No> '
             answer = input()
