@@ -78,8 +78,12 @@ def print_usage():
 Usage: {script} [-l | -r | -c | -t] <url1> [<url2> <url3> ...]
 
 \t-t:\tThrottle requests to 1 per second
-\t-l:\tLists urls in cache
+
+\t-l:\tLists urls in cache as
+\t   \t<url>, <status_code>, <Content-Type>, <timestamp>
+
 \t-r:\tRemoves urls
+
 \t-c:\tClear cache (removes all data)"""
 
     message = message.format(script=script)

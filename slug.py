@@ -1,9 +1,17 @@
 import os
 from urllib.parse import urlparse, unquote
 
+# THis class name is bad, it's not really a slug
+# The idea is clear to me, but the name isn't.
+# I get an url, which might contain
+# weird characters and structure and I want to
+# save it on the file system, thus I need only legal
+# characters, which this class is supposed to ensure
 
+# Url --> FilePath
 class Slug(object):
     '''A slug converts an url to a file path'''
+
     def __init__(self, url):
         self.url = url
 

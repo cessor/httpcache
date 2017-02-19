@@ -30,9 +30,10 @@ class Throttle(object):
         return self._session.get(url)
 
 
+# Ich schäme mich für diesen Klassennamen.
+# Leider sind alle anderen auch nicht klarer, im Moment
 class Loader(object):
     '''The loader follows urls and loads their content.'''
-
     def __init__(self, session=None):
         self._session = session or default_session()
 
