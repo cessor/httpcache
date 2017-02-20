@@ -21,7 +21,8 @@ class Slug(object):
         return ''.join(valid_characters)
 
     def _domain_to_directory(self, url):
-        url = url.replace('.', '-')
+        # Hyphens are lame. Dots are ok in folder names
+        #url = url.replace('.', '-')
         return url
 
     def _path_to_directory(self, path):

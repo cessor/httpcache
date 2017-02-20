@@ -4,7 +4,7 @@ from ..slug import Slug
 
 
 def test_domain_to_directory():
-    expected = 'www-disi-unige-it'
+    expected = 'www.disi.unige.it'
     url = 'www.disi.unige.it'
     actual = Slug('')._domain_to_directory(url)
     assert_equal(actual, expected)
