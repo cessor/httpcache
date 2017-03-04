@@ -1,8 +1,7 @@
 import datetime
 from collections import namedtuple
 
-from filesystem import *
-from slug import Slug
+from assistant.slug import Slug
 from store import RecordExists
 
 

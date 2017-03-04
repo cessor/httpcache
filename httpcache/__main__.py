@@ -10,11 +10,11 @@ Author, Johannes Feb 2017, http://cessor.de
 Todo: I need a better name for this.
 '''
 from cache import Cache
-from loader import Loader, Throttle
 from store import Store
 from folder import Folder
+from assistant.browser import Browser
 
-__all__ = ['Cache', 'Throttle', 'Loader', 'Store', 'Folder']
+__all__ = ['Cache', 'Store', 'Folder']
 
 
 def remove(cache, url):
@@ -27,6 +27,18 @@ def load_url(cache, url):
 
 
 def main(args):
+    """{script}. Downloads and caches websites.
+    Usage: {script} [-l | -r | -c | -t] <url1> [<url2> <url3> ...]
+
+    \t-t:\tThrottle requests to 1 per second
+
+    \t-l:\tLists urls in cache as
+    \t   \t<url>, <status_code>, <Content-Type>, <timestamp>
+
+    \t-r:\tRemoves urls
+    \t-c:\tClear cache (removes all data)
+    """
+
     pause = 0
     if '-t' in args:
         pause = 1
@@ -34,11 +46,7 @@ def main(args):
 
     with Cache(
         store=Store(),
-        loader=Loader(
-            session=Throttle(
-                pause=pause
-            )
-        ),
+        loader=Browser(),
         folder=Folder()
     ) as cache:
         if '-c' in args:
@@ -72,21 +80,8 @@ def no_arguments():
 
 def print_usage():
     import os
-    script = os.path.basename(__file__)
-    message = """{script}. Downloads and caches websites.
-
-Usage: {script} [-l | -r | -c | -t] <url1> [<url2> <url3> ...]
-
-\t-t:\tThrottle requests to 1 per second
-
-\t-l:\tLists urls in cache as
-\t   \t<url>, <status_code>, <Content-Type>, <timestamp>
-
-\t-r:\tRemoves urls
-
-\t-c:\tClear cache (removes all data)"""
-
-    message = message.format(script=script)
+    script = 'httpcache'
+    message = main.__doc__.format(script=script)
     print(message)
 
 

@@ -1,4 +1,4 @@
-from filesystem import *
+from assistant.filesystem import *
 
 DEFAULT_PATH = '.cached_files'
 
