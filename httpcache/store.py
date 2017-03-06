@@ -1,7 +1,6 @@
 import sqlite3
 
-HTML_CACHE = 'cache.sqlite'
-
+CACHE = 'cache.sqlite'
 
 class RecordExists(Exception):
     pass
@@ -9,7 +8,7 @@ class RecordExists(Exception):
 
 class Store(object):
     def __init__(self, path=''):
-        self._connection = sqlite3.connect(path or HTML_CACHE)
+        self._connection = sqlite3.connect(path or CACHE)
         self._initialize_database()
 
     def clear(self):
@@ -29,6 +28,7 @@ class Store(object):
             url text not null unique,
             status_code integer not null,
             content_type text,
+            content_disposition text,
             content text,
             retrieved_at datetime default current_timestamp
         )"""
@@ -38,11 +38,13 @@ class Store(object):
         self._execute(sql, ())
         self._connection.commit()
 
-    def add(self, url, status_code, content_type, content):
+    def add(self, url, status_code, content_type, content_disposition,
+            content):
         try:
-            sql = """insert into cache (url, status_code, content_type, content)
-                values (?, ?, ?, ?)"""
-            self._execute(sql, (url, status_code, content_type, content))
+            sql = """insert into cache (url, status_code, content_type,
+                content_disposition, content)
+                values (?, ?, ?, ?, ?)"""
+            self._execute(sql, (url, status_code, content_type, content_disposition, content))
             self._connection.commit()
         except sqlite3.IntegrityError:
             raise RecordExists
@@ -61,7 +63,8 @@ class Store(object):
         self._connection.commit()
 
     def retrieve(self, url):
-        sql = """select url, status_code, content_type, content, retrieved_at
+        sql = """select url, status_code, content_type,
+                content_disposition, content, retrieved_at
             from cache
             where url = ?
             limit 1"""

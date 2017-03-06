@@ -1,11 +1,11 @@
 import datetime
 from collections import namedtuple
 
-from assistant.slug import Slug
-from store import RecordExists
+from .store import RecordExists
 
 
-columns = ['url', 'status_code', 'content_type', 'content', 'retrieved_at']
+columns = ['url', 'status_code', 'content_type', 'content_disposition',
+        'content', 'retrieved_at']
 UrlRecord = namedtuple('UrlRecord', columns)
 
 
@@ -15,6 +15,7 @@ def timestamp():
 
 
 class Cache(object):
+
     '''Returns http responses for a url.
 
         Records
@@ -43,9 +44,9 @@ class Cache(object):
         Or any object with a get function that can download urls.
     '''
 
-    def __init__(self, store, loader, folder):
+    def __init__(self, store, session, folder):
         self._store = store
-        self._loader = loader
+        self._session = session
         self._folder = folder
 
     def __enter__(self):
@@ -67,9 +68,10 @@ class Cache(object):
 
         if not record:
             # Iterate over all hops and save intermediate results
-            for record in self._loader.follow(url):
+            for record in self._session.get(url):
 
-                url, status_code, content_type, content = record
+                url, status_code, content_type, content_distposition, content = record
+
                 try:
                     # Store all data in the db, except for pdfs
                     # - Store those in the file system, and
@@ -87,7 +89,7 @@ class Cache(object):
                         # the appropriate file
                         content = str(path)
 
-                    self._store.add(url, status_code, content_type, content)
+                    self._store.add(url, status_code, content_type, content_distposition, content)
 
                 except RecordExists:
                     # When redirecting, in case an intermediate hop is already
@@ -100,6 +102,7 @@ class Cache(object):
                              status_code,
                              content_type,
                              content,
+                             content_distposition,
                              timestamp()
                              )
 
