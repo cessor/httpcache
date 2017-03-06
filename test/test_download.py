@@ -33,8 +33,4 @@ def test_download_url():
 
     # Assert
     record = list(record)[0]
-
-    assert_equal(record[0], 'http://localhost:8888')
-    assert_equal(record[0], 'http://localhost:8888')
-    assert_equal(record[0], 'http://localhost:8888')
     assert_equal(record[0], 'http://localhost:8888')
