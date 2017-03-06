@@ -1,6 +1,11 @@
-from . import logmessage
 from .httpheader import HttpHeader
 import logging
+
+
+EXCEPTION = 'Exception: '
+REDIRECTS = 'Handling redirects for '
+RESPONSE = 'Authentication response: '
+RETRIEVING = 'Retrieving '
 
 
 class Download(object):
@@ -53,17 +58,17 @@ class Download(object):
         content_disposition = None
 
         try:
-            logging.info(logmessage.RETRIEVING + str(url))
+            logging.info(RETRIEVING + str(url))
             response = self._session.get(url)
-            logging.debug(logmessage.RESPONSE + str(response))
+            logging.debug(RESPONSE + str(response))
 
         except Exception as exception:
-            logging.debug(logmessage.EXCEPTION + str(exception))
+            logging.debug(EXCEPTION + str(exception))
             raise
 
         # Handle Redirects
         if response.history:
-            logging.info(logmessage.REDIRECTS + str(url))
+            logging.info(REDIRECTS + str(url))
             yield from self._hops(response.history)
 
         # Handle End of Redirect Chain
